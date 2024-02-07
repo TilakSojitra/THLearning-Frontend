@@ -20,6 +20,9 @@ import Visibility from '@mui/icons-material/Visibility'
 import VisibilityOff from '@mui/icons-material/VisibilityOff'
 import AccountCircleRoundedIcon from '@mui/icons-material/AccountCircleRounded'
 import { blue } from '@mui/material/colors'
+import { useNavigate } from 'react-router-dom'
+import axios from 'axios'
+import baseUrl from '../../api/bootapi'
 
 const LoginButton = styled(Button)`
   text-transform: none;
@@ -29,6 +32,8 @@ const LoginButton = styled(Button)`
 
 const Login = () => {
   const [showLogin, setShowLogin] = useState(true)
+
+  const navigate = useNavigate()
 
   const [loginData, setLoginData] = useState({
     email: '',
@@ -61,10 +66,36 @@ const Login = () => {
 
   const handleLogin = (e) => {
     e.preventDefault()
+
+    delete loginData.passwordConfirm
+    delete loginData.showPassword
+    // console.log(loginData)
+    axios.post(`${baseUrl}/login`, loginData).then(
+      (response) => {
+        console.log(response.data)
+        // navigate('/')
+      },
+      (error) => {
+        console.log(error.response.data)
+      }
+    )
   }
 
   const handleSignup = (e) => {
     e.preventDefault()
+
+    delete signupData.passwordConfirm
+    delete signupData.showPassword
+    console.log(signupData)
+    axios.post(`${baseUrl}/signup`, signupData).then(
+      (response) => {
+        console.log(response.data)
+        toggleSignup()
+      },
+      (error) => {
+        console.log(error.response.data)
+      }
+    )
   }
 
   const handleMouseDownPassword = (event) => {
@@ -132,9 +163,9 @@ const Login = () => {
                   <OutlinedInput
                     id="outlined-adornment-password"
                     name="password"
-                    type={signupData.showPassword ? 'text' : 'password'}
-                    value={signupData.password}
-                    onChange={handleSignupDataChange}
+                    type={loginData.showPassword ? 'text' : 'password'}
+                    value={loginData.password}
+                    onChange={handleLoginDataChange}
                     endAdornment={
                       <InputAdornment position="end">
                         <IconButton
