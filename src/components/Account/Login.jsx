@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import React, { useState } from 'react'
+import React, { useContext, useEffect, useState } from 'react'
 import {
   Paper,
   Grid,
@@ -14,15 +14,21 @@ import {
   InputLabel,
   OutlinedInput,
   IconButton,
-  InputAdornment
+  InputAdornment,
+  Stack,
+  Snackbar
 } from '@mui/material'
+import MuiAlert from '@mui/material/Alert'
 import Visibility from '@mui/icons-material/Visibility'
 import VisibilityOff from '@mui/icons-material/VisibilityOff'
 import AccountCircleRoundedIcon from '@mui/icons-material/AccountCircleRounded'
 import { blue } from '@mui/material/colors'
 import { useNavigate } from 'react-router-dom'
-import axios from 'axios'
-import baseUrl from '../../api/bootapi'
+import { axiosInstance } from '../../services/api'
+import secureLocalStorage from 'react-secure-storage'
+import { UserContext } from '../../context/DataProvider'
+import { ValidatorForm, TextValidator } from 'react-material-ui-form-validator'
+import { addSignupRules } from '../../utils/common-util'
 
 const LoginButton = styled(Button)`
   text-transform: none;
@@ -33,7 +39,25 @@ const LoginButton = styled(Button)`
 const Login = () => {
   const [showLogin, setShowLogin] = useState(true)
 
+  const [msg, setMsg] = useState('')
+
+  const [open, setOpen] = useState(false)
+  const [severity, setSeverity] = useState('error')
+
+  const handleClick = () => {
+    setOpen(true)
+  }
+
+  const handleClose = (event, reason) => {
+    if (reason === 'clickaway') {
+      return
+    }
+
+    setOpen(false)
+  }
+
   const navigate = useNavigate()
+  const { setUser } = useContext(UserContext)
 
   const [loginData, setLoginData] = useState({
     email: '',
@@ -49,6 +73,10 @@ const Login = () => {
     passwordConfirm: '',
     showPassword: false
   })
+
+  useEffect(() => {
+    addSignupRules(ValidatorForm, signupData)
+  }, [signupData.password])
 
   const handleSignupDataChange = (e, prev) => {
     setSignupData((prevData) => ({
@@ -70,13 +98,23 @@ const Login = () => {
     delete loginData.passwordConfirm
     delete loginData.showPassword
     // console.log(loginData)
-    axios.post(`${baseUrl}/login`, loginData).then(
+    axiosInstance.post('/login', loginData).then(
       (response) => {
-        console.log(response.data)
-        // navigate('/')
+        // console.log(response)
+        setUser({
+          id: response.data.id,
+          email: response.data.email,
+          name: response.data.name,
+          roleId: response.data.roleId
+        })
+        secureLocalStorage.setItem('accessToken', `Bearer ${response.data.accessToken}`)
+        secureLocalStorage.setItem('refreshToken', `Bearer ${response.data.refreshToken}`)
+        navigate('/')
       },
       (error) => {
-        console.log(error.response.data)
+        setMsg(error.errors)
+        handleClick()
+        console.log(error.errors)
       }
     )
   }
@@ -87,13 +125,15 @@ const Login = () => {
     delete signupData.passwordConfirm
     delete signupData.showPassword
     console.log(signupData)
-    axios.post(`${baseUrl}/signup`, signupData).then(
+    axiosInstance.post('/signup', signupData).then(
       (response) => {
         console.log(response.data)
         toggleSignup()
       },
       (error) => {
-        console.log(error.response.data)
+        setMsg(error.errors)
+        handleClick()
+        console.log(error.errors)
       }
     )
   }
@@ -120,6 +160,10 @@ const Login = () => {
     setShowLogin(!showLogin)
   }
 
+  const Alert = React.forwardRef(function Alert (props, ref) {
+    return <MuiAlert elevation={6} ref={ref} variant="filled" {...props} />
+  })
+
   const paperStyle = {
     padding: 20,
     margin: '15vh auto',
@@ -128,7 +172,13 @@ const Login = () => {
 
   return (
     <>
-
+      <Stack spacing={2} sx={{ width: '100%' }}>
+        <Snackbar open={open} autoHideDuration={5000} onClose={handleClose}>
+          <Alert onClose={handleClose} severity={severity} sx={{ width: '100%' }}>
+            {msg}
+          </Alert>
+        </Snackbar>
+      </Stack>
       <Grid align="center">
         <Paper elevation={5} style={paperStyle}>
           <Grid align="center">
@@ -146,6 +196,7 @@ const Login = () => {
               <form onSubmit={handleLogin}>
 
                 <TextField
+                  type='email'
                   name="email"
                   varient="outlined"
                   label="Email"
@@ -170,11 +221,11 @@ const Login = () => {
                       <InputAdornment position="end">
                         <IconButton
                           aria-label="toggle password visibility"
-                          onClick={handleClickShowPassword}
+                          onClick={() => handleClickShowPassword('login')}
                           onMouseDown={handleMouseDownPassword}
                           edge="end"
                         >
-                          {signupData.showPassword ? <Visibility /> : <VisibilityOff />}
+                          {loginData.showPassword ? <Visibility /> : <VisibilityOff />}
                         </IconButton>
                       </InputAdornment>
                     }
@@ -202,22 +253,28 @@ const Login = () => {
                   </Button>
                 </Grid>
               </form> </>
-            : <form onSubmit={handleSignup}>
-              <TextField
+            : <ValidatorForm onSubmit={handleSignup}>
+              <TextValidator
                 name="name"
+                type='text'
                 varient="outlined"
                 label="Name"
                 value={signupData.name}
+                validators={['required', 'nameFormat']}
+                errorMessages={['this field is required', 'Min Length of name must be 3']}
                 style={{ marginTop: '20px' }}
                 onChange={handleSignupDataChange}
-                fullWidth
                 required
+                fullWidth
               />
 
-              <TextField
+              <TextValidator
                 name="email"
+                type='email'
                 varient="outlined"
                 label="Email"
+                validators={['required', 'isEmail']}
+                errorMessages={['this field is required', 'email is not valid']}
                 value={signupData.email}
                 style={{ marginTop: '10px' }}
                 onChange={handleSignupDataChange}
@@ -225,25 +282,28 @@ const Login = () => {
                 required
               />
 
-              <TextField
+              <TextValidator
                 name="password"
                 style={{ marginTop: '10px' }}
                 varient="outlined"
                 type={signupData.showPassword ? 'text' : 'password'}
                 label="Password"
+                validators={['required', 'passwordStrength']}
+                errorMessages={['this field is required', 'password must contain atleast one lowercase letter,uppercase letter,special character,digit[0-9] and min length should be 8']}
                 value={signupData.password}
                 onChange={handleSignupDataChange}
                 fullWidth
                 required
               />
-              <TextField
+              <TextValidator
                 name="passwordConfirm"
                 style={{ marginTop: '10px' }}
                 varient="outlined"
                 type={signupData.showPassword ? 'text' : 'password'}
                 label="Confirm Password"
-                value={signupData.passwordConfirm}
-                helperText="Password must contain minimum of 8 characters"
+                value={signupData.passwordConfirm || ''}
+                validators={['passwordMatch', 'required']}
+                errorMessages={['password Mismatch', 'this field is required']}
                 onChange={handleSignupDataChange}
                 fullWidth
                 required
@@ -259,8 +319,8 @@ const Login = () => {
                 alignItems="center"
               >
                 <Button sx={{ fontSize: '0.8rem', mt: 0.2 }} onClick={() => toggleSignup()}>
-                    Already have an account
-                  </Button>
+                  Already have an account
+                </Button>
 
                 <Button
                   fullWidth
@@ -271,7 +331,7 @@ const Login = () => {
                 </Button>
               </Grid>
 
-            </form>}
+            </ValidatorForm>}
         </Paper>
       </Grid>
     </>

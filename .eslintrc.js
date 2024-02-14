@@ -7,6 +7,9 @@ module.exports = {
     'standard',
     'plugin:react/recommended'
   ],
+  rules: {
+    'no-unused-vars': 'warn'
+  },
   overrides: [
     {
       env: {
@@ -26,8 +29,5 @@ module.exports = {
   },
   plugins: [
     'react'
-  ],
-
-  rules: {
-  }
+  ]
 }
